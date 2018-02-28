@@ -8,168 +8,264 @@ element_canvas.height = window.innerHeight - 20;
 
 
 
-/**private implementation!!**/
+/**private implementation**/
 var fConnector = function PrivateConnector() {
 
-	this.value = function(col, row) {
+    this.info = {
 
-		return 1;
-	};
+        columnsCaptionCount : session_info.columns.length,
+        rowsCaptionCount : session_info.rows.length
+    };
 
-	this.caption = function( col ) {
+    var to_obj = function(x) {
 
-		return 'label';
-	}
+        var map_type = {
+            'expanded' : 2,
+            'collapsed' : 1,
+            'leaf' : 0,
+            'edit' : 3,
+            'no_edit' : 4
+        };
+
+        var obj = {};
+        obj.id = x.id;
+        obj.txt = x.name || x.value;
+        obj.sign = map_type[x.type];
+        obj.lvl = x.level;
+        return obj;
+    };
+
+    this.data = {
+        cols : {
+            items: [],
+            get: function (c,r) {
+                var x = this.items[c] && this.items[c][r];
+                return x && to_obj(x);
+            }
+        }
+        ,
+        rows : {
+            items : [],
+            get : function(c,r) {
+                var x = this.items[r] && this.items[r][c];
+                return x && to_obj(x);
+            }
+        },
+        values : {
+            items : [],
+            get : function(c,r) {
+                var x = this.items[c] && this.items[c][r];
+                return x && to_obj(x[0]);                                                                               //TODO:multivalues
+            }
+        }
+    };
+
+    this.get = function( col1, row1, cols, rows ) {
+
+        console.log( 'load' );
+        //TODO: call API by params
+        this.data.cols.items = session_data.columns.items;
+        this.data.rows.items = session_data.rows.items;
+        this.data.values.items = session_data.data.items;
+
+        return this.data;
+    };
 };
 
 var pivot = new Pivot( element_canvas, fConnector );
 
 var actions = {
 
-	key_map : {
+    key_map : {
 
-		100: [1, 0],
-		97: [-1, 0],
-		115: [0, 1],
-		119: [0, -1]
-	},
+        100: [1, 0],
+        97: [-1, 0],
+        115: [0, 1],
+        119: [0, -1]
+    },
 
-	keypressed : function( key ) {
+    keypressed : function( key ) {
 
-		return key in this.key_map && this.key_map[ key ] || [ 0, 0 ];
-	}
+        return key in this.key_map && this.key_map[ key ] || [ 0, 0 ];
+    }
 };
-
-pivot.draw();
 
 function KeyPressed() {
 
 
-	var log_start_time = new Date();
-	///---->
+    var log_start_time = new Date();
+    ///---->
 
 
-	var d = actions.keypressed( event.keyCode );
-	pivot.scroll( d[ 0 ], d[ 1 ] );
-	pivot.draw();
+    var d = actions.keypressed( event.keyCode );
+    pivot.scroll( d[ 0 ], d[ 1 ] );
+    pivot.draw();
 
 
-	///<----
-	var time = new Date() - log_start_time;
-	document.getElementById("stat").innerHTML = time+" ms";
-	console.log( time + " ms" );
+    ///<----
+    var time = new Date() - log_start_time;
+    document.getElementById("stat").innerHTML = time+" ms";
+    console.log( time + " ms" );
 }
 
+pivot.draw();
 
 function Pivot( canvas, fConnector ) {
 
-	var ctx = canvas.getContext( '2d' );
-	ctx.font = '10px Arial';
-	ctx.textAlign = 'end';
+    var ctx = canvas.getContext( '2d' );
+    ctx.font = '12px Calibri';
 
-	var connector = new fConnector;
+    var connector = new fConnector;
 
-	var style = {
+    var dx = 0,
+        dy = 0;
 
-		cell : {
+     function header( size ) {
 
-			width: 102,
-			height: 25,
-			margin_x: 3,
-			margin_y: 4
-		}
-	};
+        return {
 
-	//viewport
-	var v = {
+            fix : size,
+            in : function( i ) {
 
-		col1 : 0,
-		row1 : 0,
-		cols : 0,
-		rows : 0,
+                return i < this.fix;
+            }
+        }
+    }
 
-		init : function( cols, rows ) {
+    var header_of_rows = header( connector.info.rowsCaptionCount );
+    var header_of_cols = header( connector.info.columnsCaptionCount );
 
-			this.cols = cols;
-			this.rows = rows;
-		}
-	};
+    function style( obj, col, row ) {
 
-	//buffer
-	var b = {
+        this.style_header = {
 
-		size_x : null,
-		size_y : null,
-		offset_x : null,
-		offset_y : null,
-		data : null,
-		caption : null,
+            margin_x : 3,
+            margin_y : 4,
+            align : 'start',
+            format : function( obj ) {
 
-		init : function( cols, rows ) {
+                var sign_map = {
 
-			this.size_x = cols;
-			this.size_y = rows;
+                    0 : '  ',
+                    1 : '+ ',
+                    2 : '- ',
+                    3 : '',
+                    4 : ''
+                };
 
-			this.data = new Array( this.size_x );
-			for ( var x = 0; x < this.size_x; x++ )
-				this.data[ x ] = new Array( this.size_y );
+                return obj && obj.txt && sign_map[obj.sign] + obj.txt || '';
+            }
+        };
+        this.style_value = {
 
-			this.caption = new Array( this.size_x );
-		},
+            margin_x : 3,
+            margin_y : 4,
+            align : 'end',
+            format : function( obj ) {
 
-		load : function() {
+                return obj && obj.txt && obj.txt.toLocaleString() || '';                                                //TODO:not fast enough
+            }
+        };
 
-			for ( var x = 0; x < this.size_x; x++ )
-				this.caption[ x ] = connector.caption( x + this.offset_x );
+        var s = header_of_cols.in( row.n ) || header_of_rows.in( col.n ) ? this.style_header : this.style_value;
 
-			for ( var y = 0; y < this.size_y; y++ )
-				for ( var x = 0; x < this.size_x; x++ )
-					this.data[ x ][ y ] = connector.value( x + this.offset_x, y + this.offset_y );
-		}
-	};
+        return {
 
-	v.init( Math.ceil( canvas.width / style.cell.width ), Math.ceil( canvas.height / style.cell.height ) );
-	b.init( v.cols + 10, v.rows + 10 );
+            txt : s.format( obj ),
+            x : s.align == 'end' && col.pos + col.size - s.margin_x || col.pos + s.margin_x,
+            y : row.pos + row.size - s.margin_y,
+            align : s.align
+        }
+    }
 
-	var update = function() {
+    function axes( size, size_limit ) {
 
-		if ( v.cols > b.size_x || v.rows > b.size_y )
-			throw Error( 'window buffer mismatch' );
+        function axis( size ) {
 
-		if ( v.col1 < b.offset_x || v.row1 < b.offset_y || v.col1 + v.cols > b.offset_x + b.size_x || v.row1 + v.rows > b.offset_y + b.size_y || b.offset_x == null || b.offset_y == null ) {
+            return function( n ) {
 
-			b.offset_x = Math.max( 0, v.col1 - Math.floor( ( b.size_x - v.cols ) * 0.5 ) );
-			b.offset_y = Math.max( 0, v.row1 - Math.floor( ( b.size_y - v.rows ) * 0.5 ) );
+                this.n = n;
+                this.size = size;
+                this.pos = this.n * this.size;
+                this.in = function( size ) {
 
-			b.load();
-			console.log( 'load' );
-		}
-	};
+                    return this.pos < size;
+                }
+            };
+        }
 
-	this.scroll = function( dx, dy ) {
+        var ret = [];
+        var f_item = axis( size );
 
-		v.col1 += dx;
-		v.row1 += dy;
-	};
+        while ( ret.length == 0 || ret[ ret.length - 1].in( size_limit ) ) {
 
-	this.draw = function() {
+            ret.push( new f_item( ret.length ) );
+        }
 
-		update();
+        return ret;
+    }
 
-		ctx.clearRect( 0, 0, ctx.canvas.width, ctx.canvas.height );
+    var cols = axes( 102, canvas.width );
+    var rows = axes( 25, canvas.height );
 
-		for ( var i = 0; i < v.cols; i++ ) {
+    this.draw = function() {
 
-			//caption
-			ctx.fillText(b.caption[i + v.col1 - b.offset_x], ( i + 1 ) * style.cell.width - style.cell.margin_x, 10);
+        update();
 
-			for (var j = 0; j < v.rows; j++) {
+        var w = ctx.canvas.width;
+        var h = ctx.canvas.height;
+        ctx.clearRect( 0, 0, w, h );
 
-				//values
-				ctx.fillText(b.data[i + v.col1 - b.offset_x][j + v.row1 - b.offset_y], ( i + 1 ) * style.cell.width - style.cell.margin_x, ( j + 1 ) * style.cell.height - style.cell.margin_y);
-			}
-		}
-	};
+        var i = 0;
+        while ( cols[ i ].in( w ) ) {
 
+            var j = 0;
+            while ( rows[ j ].in( h ) ) {
 
+                var obj =
+                    header_of_rows.in( i ) && !header_of_cols.in( j ) && buffer.data.rows.get( i, j + dy - header_of_cols.fix ) ||
+                    header_of_cols.in( j ) && !header_of_rows.in( i ) && buffer.data.cols.get( i + dx - header_of_rows.fix, j ) ||
+                    !header_of_cols.in( j ) && !header_of_rows.in( i ) && buffer.data.values.get( i + dx - header_of_rows.fix, j + dy - header_of_cols.fix );
+
+                var s = style( obj, cols[ i ], rows[ j ] );
+
+                ctx.textAlign = s.align;
+                ctx.fillText( s.txt, s.x, s.y );
+
+                j++;
+            }
+            i++;
+        }
+    };
+
+    var buffer = {
+
+        col1 : 0,
+        row1 : 0,
+        n_cols : 0,
+        n_rows : 0,
+        data : null
+    };
+
+    var update = function() {
+
+        var b = buffer;
+        var fix_cols = header_of_rows.fix;
+        var fix_rows = header_of_cols.fix;
+
+        if ( !b.data || dx < b.col1 || dy < b.row1 || dx + cols.length - fix_cols > b.col1 + b.n_cols || dy + rows.length - fix_rows > b.row1 + b.n_rows ) {
+
+            b.col1 = dx - 10;
+            b.row1 = dy - 10;
+            b.n_cols = cols.length - fix_cols + 20;
+            b.n_rows = rows.length - fix_rows + 20;
+            b.data = connector.get( b.col1, b.row1, b.n_cols, b.n_rows );                                               //TODO: in b?
+        }
+    };
+
+    this.scroll = function( x, y ) {
+
+        dx = Math.max( 0, dx + x );
+        dy = Math.max( 0, dy + y );
+    };
 }
