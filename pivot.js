@@ -1,54 +1,79 @@
-function Pivot( canvas ) {
+var Pivot = (function( exports ) {
 
-    const CONFIG = {
+    var Config = {
 
         COLOR_FONT : '#000000',
         COLOR_BACKGROUND : '#AAAAAA',
         COLOR_CELL : '#FFFFFF',
+        COLOR_EDIT : '#FFFFFF',
         COLOR_CELL_SELECTED : '#F0F0F0',
         COLOR_HEADER : '#F0F0F0',
         SIGN_MAP : {
 
-            0 : '  ',//none
-            1 : '+ ',//expand
-            2 : '- ',//collapse
-            3 : '',//edit
-            4 : ''//no_edit
+            0 : '  ',       //none
+            1 : '+ ',       //expand
+            2 : '- ',       //collapse
+            3 : '',         //edit
+            4 : ''          //no_edit
         },
         CELL_W : 102,
         CELL_H : 26,
+        CELL_EDIT_UNDERLINE_MARGIN : 5,
+        CELL_EDIT_CURSOR_MARGIN : 3,
         FONT_VALUE : '10px Roboto Mono',
-        FONT_HEADER : '10px Roboto Mono'
+        FONT_HEADER : '10px Roboto Mono',
+        set : function( cfg ) {
+
+            Object.assign( this, cfg );
+
+            return this;
+        }
     };
 
-    var dx = 0,
-        dy = 0;
+    function assign( dst, src ) {
 
-    function header( size ) {
-
-        return {
-
-            fix : size,
-            in : function( i ) {
-
-                return i < this.fix;
-            }
-        }
+        return Object.assign( Object.assign( {}, dst ), src );
     }
 
-    var header_of_rows = null;
-    var header_of_cols = null;
+    var canvas = null;
+
+    var set_canvas = function( dom ) {
+
+        canvas = dom;
+
+        input_text_area = document.createElement( 'textarea' );
+        input_text_area.setAttribute( 'style', 'clip: rect(1px, 1px, 1px, 1px); position: absolute !important; height: 1px; width: 1px; overflow: hidden; opacity: 0' );
+        input_text_area.addEventListener( 'input', function () {
+
+            draw();                                                                                                     //TODO:repaint one only cell
+        } );
+
+        document.body.appendChild( input_text_area );
+
+        canvas.addEventListener( 'click', MouseClick, false );
+        canvas.addEventListener( 'dblclick', MouseDblClick, false );
+        canvas.addEventListener( 'mousemove', MouseMove, false );
+        canvas.addEventListener( 'mousedown', MouseDown, false );
+        canvas.addEventListener( 'mouseup', MouseUp, false );
+        canvas.addEventListener( 'wheel', MouseWheel, false );
+        canvas.ownerDocument.addEventListener( 'keyup', KeyUp, false );
+        canvas.ownerDocument.addEventListener( 'keydown', KeyDown, false );
+
+        this.resize();
+
+        return this;
+    };
 
     function bars( size, size_limit ) {
 
         function bar( size ) {
 
-            return function( n ) {
+            return function ( n ) {
 
                 this.n = n;
                 this.size = size;
                 this.pos = this.n * this.size;
-                this.in = function( size ) {
+                this.in = function ( size ) {
 
                     return this.pos < size;
                 }
@@ -58,14 +83,14 @@ function Pivot( canvas ) {
         var ret = [];
         var f_item = bar( size );
 
-        while ( ret.length == 0 || ret[ ret.length - 1].in( size_limit ) ) {
+        while ( ret.length == 0 || ret[ ret.length - 1 ].in( size_limit ) ) {
 
             ret.push( new f_item( ret.length ) );
         }
 
-        ret.at = function( px ) {
+        ret.at = function ( px ) {
 
-            for ( var i = 0; i < ret.length; i++) {
+            for ( var i = 0; i < ret.length; i++ ) {
 
                 var axis = ret[ i ];
                 if ( px >= axis.pos && px <= axis.pos + axis.size )
@@ -73,7 +98,7 @@ function Pivot( canvas ) {
             }
         };
 
-        ret.go = function( from, n, f ) {
+        ret.go = function ( from, n, f ) {
 
             n = n || this.length - from;
             for ( var i = from; i < from + n; i++ )
@@ -83,47 +108,13 @@ function Pivot( canvas ) {
         return ret;
     }
 
-    var cols = bars( CONFIG.CELL_W, canvas.width );
-    var rows = bars( CONFIG.CELL_H, canvas.height );
-
-    function col_to_idx( col ) {
-
-        return col + dx - data.cols.from - header_of_rows.fix;
-    }
-
-    function row_to_idx( row ) {
-
-        return row + dy - data.rows.from - header_of_cols.fix;
-    }
-
-    function data_col( c ) {
-
-        return data && header_of_cols.in( c.j ) && !header_of_rows.in( c.i ) && data.cols.get( col_to_idx( c.i ), c.j );
-    }
-
-    function data_row( c ) {
-
-        return data && header_of_rows.in( c.i ) && !header_of_cols.in( c.j ) && data.rows.get( c.i, row_to_idx( c.j ) );
-    }
-
-    function data_value( c ) {
-
-        return data && !header_of_cols.in( c.j ) && !header_of_rows.in( c.i ) && data.values.get( col_to_idx( c.i ), row_to_idx( c.j ) );
-    }
-
-    function data_any( c ) {
-
-        return c && ( data_row( c ) ||
-              data_col( c ) ||
-             data_value( c ) );
-    }
+    var cols = null;
+    var rows = null;
 
     function Cell( i, j ) {
 
         this.i = i || 0;
         this.j = j || 0;
-        this.absi = i + dx || 0;
-        this.absj = j + dy || 0;
 
         return this;
     }
@@ -132,25 +123,298 @@ function Pivot( canvas ) {
 
         constructor : Cell,
 
-        setXY : function( x, y ) {
+        setXY : function ( x, y ) {
 
             var col = cols.at( x ),
                 row = rows.at( y );
 
             this.i = col.n;
             this.j = row.n;
-            this.absi = col.n + dx;
-            this.absj = row.n + dy;
 
             return this;
         },
 
-        isVisible : function() {
+        isVisible : function () {
 
             var col = cols[ this.i ],
                 row = rows[ this.j ];
 
             return col && col.in( canvas.width ) && row && row.in( canvas.height );
+        },
+
+
+        setShift : function ( di, dj ) {
+
+            this.i += di;
+            this.j += dj;
+
+            return this;
+        },
+
+        set : function ( i, j ) {
+
+            this.i = i;
+            this.j = j;
+
+            return this;
+        },
+
+        setI : function ( i ) {
+
+            this.i = i;
+
+            return this;
+        },
+
+        setJ : function ( j ) {
+
+            this.j = j;
+
+            return this;
+        },
+
+        clone : function () {
+
+            return new this.constructor( this.i, this.j );
+        },
+
+        add : function ( c ) {
+
+            this.i += c.i;
+            this.j += c.j;
+
+            return this;
+        },
+
+        sub : function ( c ) {
+
+            this.i -= c.i;
+            this.j -= c.j;
+
+            return this;
+        },
+
+        min : function ( c ) {
+
+            this.i = Math.min( this.i, c.i );
+            this.j = Math.min( this.j, c.j );
+
+            return this;
+        },
+
+        max : function ( c ) {
+
+            this.i = Math.max( this.i, c.i );
+            this.j = Math.max( this.j, c.j );
+
+            return this;
+        },
+
+        clamp : function ( min, max ) {
+
+            this.i = Math.max( min.i, Math.min( max.i, this.i ) );
+            this.j = Math.max( min.j, Math.min( max.j, this.j ) );
+
+            return this;
+
+        },
+
+        equals : function ( c ) {
+
+            return c && ( c.i === this.i && c.j === this.j );
+        }
+    };
+
+    const
+        cell_zero = new Cell(),
+        cell_left = new Cell( -1, 0 ),
+        cell_right = new Cell( 1, 0 ),
+        cell_up = new Cell( 0, -1 ),
+        cell_down = new Cell( 0, 1 ),
+        cell_one = new Cell( 1, 1 );
+
+
+    function Area( c1, c2 ) {
+
+        this.c1 = c1 && c1.clone();
+        this.c2 = c2 && c2.clone() || c1;
+
+        this.c1.min( this.c2 );
+        this.c2.max( c1 );
+
+        return this;
+    }
+
+    Area.prototype = {
+
+        constructor : Area,
+
+        distTo : function ( c ) {
+
+            var max = c.clone().sub( this.c2 ).max( cell_zero );
+            var min = c.clone().sub( this.c1 ).min( cell_zero );
+
+            return min.add( max );
+        },
+
+        shift : function ( c ) {
+
+            this.c1.add( c );
+            this.c2.add( c );
+
+            return this;
+        },
+
+        contains : function ( a ) {
+
+            var c1 = a.c1 || a;
+            var c2 = a.c2 || a;
+
+            return this.c1.i <= c1.i &&
+                this.c1.j <= c1.j &&
+                this.c2.i >= c2.i &&
+                this.c2.j >= c2.j;
+        },
+
+        clone : function () {
+
+            return new this.constructor( this.c1, this.c2 );
+        },
+
+        size : function () {
+
+            return this.c2.clone().sub( this.c1 );
+        },
+
+        shrink : function ( c ) {
+
+            this.c1.add( c );
+            this.c2.sub( c );
+
+            return this;
+        },
+
+        expand : function ( c ) {
+
+            this.c1.sub( c );
+            this.c2.add( c );
+
+            return this;
+        },
+
+        clamp : function ( a ) {
+
+            this.c1.max( a.c1 ).min( a.c2 );
+            this.c2.max( a.c1 ).min( a.c2 );
+
+            return this;
+        }
+    };
+
+    function Vec( x, y ) {
+
+        this.x = x;
+        this.y = y;
+
+        return this;
+    }
+
+    Vec.prototype = {
+
+        constructor : Vec,
+
+        clone : function () {
+
+            return new this.constructor( this.x, this.y );
+        }
+    };
+
+    function Rect( a ) {
+
+        var c1 = cols[ a.c1.i ];
+        var c2 = cols[ a.c2.i ];
+        var r1 = rows[ a.c1.j ];
+        var r2 = rows[ a.c2.j ];
+
+        this.x = c1.pos;
+        this.y = r1.pos;
+        this.width = c2.pos - c1.pos + c2.size;
+        this.height = r2.pos - r1.pos + r2.size;
+
+        return this;
+    }
+
+    Rect.prototype = {
+
+        constructor : Rect,
+
+        shrink : function ( x1, y1, x2, y2 ) {
+
+            y1 = y1 || 0;
+            x2 = x2 || 0;
+            y2 = y2 || 0;
+
+            this.x += x1;
+            this.y += y1;
+            this.width -= x1 + x2;
+            this.height -= y1 + y2;
+
+            return this;
+        },
+
+        getCenter : function () {
+
+            return new Vec( this.x + this.width * 0.5, this.y + this.height * 0.5 );
+        },
+
+        getFarCorner : function () {
+
+            return new Vec( this.x + this.width, this.y + this.height );
+        }
+    };
+
+    var project = function( c ) {
+
+        return c.clone().sub( exports.Range.scroll ).add( exports.Range.header );
+    };
+
+    var unproject = function( c ) {
+
+        var s = c.clone().add( exports.Range.scroll ).sub( exports.Range.header );
+
+        is_in_row_header( c ) && s.setI( c.i );
+        is_in_col_header( c ) && s.setJ( c.j );
+
+        return s;
+    };
+
+    function is_in_row_header( c ) {
+
+        return c.i < exports.Range.header.i && c.j >= exports.Range.header.j;
+    }
+
+    function is_in_col_header( c ) {
+
+        return c.j < exports.Range.header.j && c.i >= exports.Range.header.i;
+    }
+
+    function is_in_values( c ) {
+
+        return c.i >= exports.Range.header.i && c.j >= exports.Range.header.j;
+    }
+
+     var Range = {
+
+        scroll : new Cell(),
+        header : null,
+        data : null,
+        values : null,
+        update : function() {
+
+            this.scroll.max( cell_zero, this.scroll );
+            this.header = data.buffer && new Cell( data.buffer.rows[ 0 ].length, data.buffer.cols[ 0 ].length ) || cell_zero.clone();
+            this.data = data.buffer && new Area( cell_zero, new Cell( data.buffer.cols.length - 1, data.buffer.rows.length - 1 ) );
+            this.values = new Area( this.header || cell_zero, new Cell( cols.at( canvas.width ).n, rows.at( canvas.height ).n ) );
         }
     };
 
@@ -160,284 +424,367 @@ function Pivot( canvas ) {
         //var ctx = canvas.getContext('2d', { alpha: false });
         ctx.textBaseline = 'middle';
 
-        var style_header_col = {
-
-            margin_x : 7,
-            align : 'start',
-            border : 1,
-            color : CONFIG.COLOR_HEADER,
-            font : CONFIG.FONT_HEADER,
-            format : function( obj ) {
-
-                return obj && obj.txt && CONFIG.SIGN_MAP[ obj.sign ] + obj.txt || '';
-            }
-        };
-
-        var style_header_row = {
-
-            margin_x : 7,
-            align : 'start',
-            border : 1,
-            color : CONFIG.COLOR_HEADER,
-            font : CONFIG.FONT_HEADER,
-            format : function( obj ) {
-
-                return obj && obj.txt && CONFIG.SIGN_MAP[ 0 ].repeat( obj.lvl - 1 ) + CONFIG.SIGN_MAP[ obj.sign ] + obj.txt || '';
-            }
-        };
-
         var style_value = {
 
             margin_x : 5,
             align : 'end',
             border : 1,
-            color : CONFIG.COLOR_CELL,
-            font : CONFIG.FONT_VALUE,
-            format : function( obj ) {
+            color : Config.COLOR_CELL,
+            font : Config.FONT_VALUE,
+            format : function ( obj ) {
 
-                return obj && obj.txt && obj.txt.toLocaleString() || '';                                                    //TODO:not fast enough
+                return obj && obj.txt && obj.txt.toLocaleString();// || '';                                             //TODO:toLocaleString is not fast enough
             }
         };
 
-        var style_value_selected = Object.assign( {}, style_value );
-        style_value_selected.color = CONFIG.COLOR_CELL_SELECTED;
+        var style_header_col = assign( style_value, {
 
-        function format( obj, s, c1, r1, c2, r2 ) {
+            margin_x : 7,
+            align : 'start',
+            color : Config.COLOR_HEADER,
+            font : Config.FONT_HEADER,
+            format : function ( obj ) {
 
-            c2 = c2 || c1;
-            r2 = r2 || r1;
+                return obj && obj.txt && Config.SIGN_MAP[ obj.sign ] + obj.txt;
+            }
+        });
+
+        var style_header_row = assign( style_header_col, {
+
+            format : function ( obj ) {
+
+                return obj && obj.txt && Config.SIGN_MAP[ 0 ].repeat( obj.lvl - 1 ) + Config.SIGN_MAP[ obj.sign ] + obj.txt;
+            }
+        });
+
+        var style_edit = assign( style_value, {
+
+            color : Config.COLOR_EDIT,
+            format : function ( obj ) {
+
+                return obj && obj.txt || obj;
+            }
+        });
+
+        function format( obj, s, cell1, cell2 ) {
+
+            cell2 = cell2 || cell1;
+
+            var r = new Rect( new Area( cell1, cell2 ) )
+                .shrink( s.border, s.border );
+            var r_center = r.getCenter();
+            var r_far = r.getFarCorner();
+            var s_txt = s.format( obj );
 
             return {
 
                 txt : {
 
-                    s : s.format( obj ),
-                    x : s.align == 'end' && c2.pos + c2.size - s.margin_x || c1.pos + s.margin_x,
-                    y : r1.pos + ( r2.pos + r2.size - r1.pos ) * 0.5,
+                    s : s_txt,
+                    vec : new Vec( s.align == 'end' && r_far.x - s.margin_x || r.x + s.margin_x, r_center.y ),
                     align : s.align,
-                    color : CONFIG.COLOR_FONT,
+                    color : Config.COLOR_FONT,
                     font : s.font
                 },
                 cell : {
 
-                    x: c1.pos + s.border,
-                    y: r1.pos + s.border,
-                    w: c2.pos - c1.pos + c2.size - s.border,
-                    h: r2.pos - r1.pos + r2.size - s.border,
+                    rect : r,
                     color : s.color
                 }
             }
         }
 
-        function cell_left( c ) {
+        function get_draw_cell( c, s, f, prev, next, parent ) {
 
-            return new Cell( c.i - 1, c.j );
-        }
+            function cell_eq( c1, c2, f ) {
 
-        function cell_right( c ) {
+                if ( c1.equals( c2 ) )
+                    return true;
 
-            return new Cell( c.i + 1, c.j );
-        }
+                var d1 = c1 && f( unproject( c1 ) );
+                var d2 = c2 && f( unproject( c2 ) );
 
-        function cell_up( c ) {
-
-            return new Cell( c.i, c.j - 1 );
-        }
-
-        function cell_down( c ) {
-
-            return new Cell( c.i, c.j + 1 );
-        }
-
-        /*function cell_visible( c ) {
-
-            var col = cols[ c.i ],
-                row = rows[ c.j ];
-
-            return col && col.in( w ) && row && row.in( h );
-        }*/
-
-        function cell_eq( c1, c2, f ) {
-
-            if ( c1.i == c2.i && c1.j == c2.j )
-                return true;
-
-            var d1 = c1 && f( c1 );
-            var d2 = c2 && f( c2 );
-
-            return d1 && d2 && d1.id == d2.id;
-        }
-
-        function cell_geom( c ) {
-
-            //TODO: selection pass up header!!!
-            var col = cols[ Math.max( c.i, header_of_rows.fix ) ];
-            var row = rows[ Math.max( c.j, header_of_cols.fix ) ];
-
-            return {
-
-                x : col && col.pos || 0,
-                y : row && row.pos || 0,
-                w : col && col.size || 0,
-                h : row && row.size || 0
+                return d1 && d2 && d1.id == d2.id;
             }
-        }
 
-        function get_draw_cell( c, s, f, cell_prev, cell_next, cell_parent ) {
+            function get( c, dir ) {
 
-            var cr = cell_next( c );
-            var p = cell_parent( c );
-            var pr = cell_next( cell_parent( c ) );
+                return c.clone().add( dir );
+            }
+
+            var cr = get( c, next );
+            var p = get( c, parent );
+            var pr = get( get( c, parent ), next );
 
             //break - draw merged cell
-            //if ( !cell_visible( cr ) || !cell_eq( c, cr, f ) || ( cell_visible( p ) && !cell_eq( p, pr, f ) ) ) {
             if ( !cr.isVisible() || !cell_eq( c, cr, f ) || ( p.isVisible() && !cell_eq( p, pr, f ) ) ) {
 
                 var cl = c;
-                var pl = cell_parent( cl );
+                var pl = get( cl, parent );
                 //search for start of merged cell
-                while ( cl.isVisible() && cell_eq( c, cell_prev( cl ), f ) && ( !pl.isVisible() || cell_eq( p, cell_prev( pl ), f ) ) ) {
+                while ( cl.isVisible() && cell_eq( c, get( cl, prev ), f ) && ( !pl.isVisible() || cell_eq( p, get( pl, prev ), f ) ) ) {
 
-                    cl = cell_prev( cl );
-                    pl = cell_parent( cl );
+                    cl = get( cl, prev );
+                    pl = get( cl, parent );
                 }
 
-                paint_obj( f( c ), s, cl.i, cl.j, c.i, c.j );
+                paint_obj( format( f( unproject( c ) ), s, cl, c ) );
             }
         }
 
-        function paint_obj( obj, s, i, j, i2, j2 ) {
+        function paint_obj( f ) {
 
-            var c1 = cols[ i ];
-            var r1 = rows[ j ];
-            var c2 = cols[ i2 ] || c1;
-            var r2 = rows[ j2 ] || r1;
-            var f = format( obj, s, c1, r1, c2, r2 );
-
-            if ( !obj )
+            if ( f.txt.s === undefined )
                 return;
 
             ctx.fillStyle = f.cell.color;
-            ctx.fillRect( f.cell.x, f.cell.y, f.cell.w, f.cell.h );
+            ctx.fillRect( f.cell.rect.x, f.cell.rect.y, f.cell.rect.width, f.cell.rect.height );
 
             ctx.fillStyle = f.txt.color;
             ctx.textAlign = f.txt.align;
             ctx.font = f.txt.font;
-            ctx.fillText( f.txt.s, f.txt.x, f.txt.y );
+            ctx.fillText( f.txt.s, f.txt.vec.x, f.txt.vec.y );
         }
 
         function paint_selection() {
 
-            var selection_box = selection.box();
-            if ( selection_box ) {
+            var c1 = project( selection.a.c1 );
+            var c2 = project( selection.a.c2 );
+
+            if ( exports.Range.values.contains( c1 ) || exports.Range.values.contains( c2 ) ) {
 
                 ctx.globalCompositeOperation = 'multiply';
                 ctx.fillStyle = 'rgba(200,200,200,0.5)';
-                var g1 = cell_geom( selection_box.from );
-                var g2 = cell_geom( selection_box.to );
-                ctx.fillRect( g1.x, g1.y, g2.x + g2.w - g1.x, g2.y + g2.h - g1.y );
+
+                var r = new Rect(
+                    //new Area( c1, c2 ).clamp( values_area )
+                    new Area( c1, c2 ).clamp( exports.Range.values )
+                );
+                ctx.fillRect( r.x, r.y, r.width, r.height );
 
                 ctx.globalCompositeOperation = 'source-over';//default
             }
         }
 
-        return function() {
+        function paint_edit() {
 
-            //TODO:performance temp tip
+            var fmt = format(
+                edit.get_text(),
+                style_edit,
+                project( edit.c )
+            );
+
+            paint_obj( fmt );
+
+            var sel = edit.get_selection(),
+                underline = sel[ 0 ] != sel[ 1 ],
+
+                far_corner = fmt.cell.rect.getFarCorner(),
+                text_width = Math.floor( ctx.measureText( fmt.txt.s ).width ),
+
+                u0 = new Vec( fmt.txt.vec.x - text_width, far_corner.y - Config.CELL_EDIT_UNDERLINE_MARGIN ),
+                u1 = new Vec( fmt.txt.vec.x, u0.y ),
+                c0 = new Vec( far_corner.x - Config.CELL_EDIT_CURSOR_MARGIN, fmt.cell.rect.y + Config.CELL_EDIT_UNDERLINE_MARGIN ),
+                c1 = new Vec( c0.x, far_corner.y - Config.CELL_EDIT_UNDERLINE_MARGIN ),
+                v0 = underline && u0 || c0,
+                v1 = underline && u1 || c1;
+
+            ctx.beginPath();
+            ctx.moveTo( v0.x, v0.y );
+            ctx.lineTo( v1.x, v1.y );
+            ctx.strokeStyle = Config.COLOR_FONT;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function get_col( c ) {
+
+            return exports.data.get_col( c );
+        }
+
+        function get_row( c ) {
+
+            return exports.data.get_row( c );
+        }
+
+        function get_value( c ) {
+
+            return exports.data.get_value( c );
+        }
+
+        return function () {
+
+
             var log_start_time = new Date();
 
             //ctx.clearRect( 0, 0, w, h );
-            ctx.fillStyle = CONFIG.COLOR_BACKGROUND;
+            ctx.fillStyle = Config.COLOR_BACKGROUND;
             ctx.fillRect( 0, 0, w, h );
 
-
-            /*
-            ctx.beginPath();
-            cols.go( 0, 0, function ( col, i ) {
-
-                ctx.moveTo( col.pos, 0 );
-                ctx.lineTo( col.pos, h );
-            });
-
-            rows.go( 0, 0, function ( row, j ) {
-
-                ctx.moveTo( 0, row.pos );
-                ctx.lineTo( w, row.pos );
-            });
-            ctx.stroke();
-            */
             //values
-            cols.go( header_of_rows.fix, 0, function ( col, i ) {
+            cols.go( exports.Range.header.i, 0, function ( col, i ) {
 
-                rows.go( header_of_cols.fix, 0, function ( row, j ) {
+                rows.go( exports.Range.header.j, 0, function ( row, j ) {
 
                     var c = new Cell( i, j );
                     paint_obj(
-                        data_value( c ),
-                        style_value,//selection.contains( c ) && style_value_selected || style_value,
-                        col.n,
-                        row.n
+                        format(
+                            get_value( unproject( c ) ),
+                            style_value,
+                            c
+                        )
                     );
-                });
-            });
+                } );
+            } );
+
+            selection.a && exports.Range.data.contains( selection.a ) && paint_selection();
+
+            edit.c && exports.Range.values.contains( project( edit.c ) ) && paint_edit();
 
             //col headers
-            cols.go( header_of_rows.fix, 0, function ( col, i ) {
+            cols.go( exports.Range.header.i, 0, function ( col, i ) {
 
-                rows.go( 0, header_of_cols.fix, function ( row, j ) {
+                rows.go( 0, exports.Range.header.j, function ( row, j ) {
 
+                    var c = new Cell( i, j );
                     get_draw_cell(
-                        new Cell( i, j ),
+                        c,
                         style_header_col,
-                        data_col,
+                        get_col,
                         cell_left,
                         cell_right,
                         cell_up
                     );
-                });
-            });
+                } );
+            } );
 
             //row headers
-            cols.go( 0, header_of_rows.fix, function ( col, i ) {
+            cols.go( 0, exports.Range.header.i, function ( col, i ) {
 
-                rows.go( header_of_cols.fix, 0, function ( row, j ) {
+                rows.go( exports.Range.header.j, 0, function ( row, j ) {
 
+                    var c = new Cell( i, j );
                     get_draw_cell(
-                        new Cell( i, j ),
+                        c,
                         style_header_row,
-                        data_row,
+                        get_row,
                         cell_up,
                         cell_down,
                         cell_left
                     );
-                });
-            });
+                } );
+            } );
 
-            selection && paint_selection();
-
-            //TODO:performance temp tip
             var time = new Date() - log_start_time;
-            document.getElementById( "stat" ).innerHTML = time+" ms";
+            document.getElementById( "stat" ).innerHTML = time + " ms";
         }
     };
 
-    var draw = new grid( canvas.width, canvas.height );
+    var draw = null;
+
+    var selection = {
+
+            a : null,
+
+            set : function ( a ) {
+
+                edit.clear();
+
+                this.a = a.clone().clamp( exports.Range.data );
+                //this.a = a.clone();
+
+                input_text_area.value = get_text( this.a );
+
+                return this;
+            }
+        },
+
+        edit = {
+
+            c : null,
+            orig_txt : null,
+
+            set : function ( c ) {
+
+                var obj = exports.data.get_value( c );
+                if ( !obj || obj.sign != 3 )
+                    return;
+
+                this.c = c.clone();
+
+                input_text_area.focus();
+                input_text_area.select();
+
+                this.orig_txt = this.get_text();
+
+                return this;
+            },
+
+            clear : function () {
+
+                //save
+                this.c &&
+                this.orig_txt != this.get_text() &&
+                on_data_change_callback && on_data_change_callback( this.orig_txt, this.c.i, this.c.j );
+
+                this.c = null;
+                this.orig_txt = null;
+
+                return this;
+            },
+
+            get_text : function () {
+
+                //var s = input_text_area.value;
+                //var p = this.get_selection();
+                //return p[ 0 ] === p[ 1 ] && [ s.slice( 0, p[ 0 ] ), s.slice( p[ 0 ] ) ].join( '' ) || s;
+                return input_text_area.value;
+            },
+
+            get_selection : function () {
+
+                return [ input_text_area.selectionStart, input_text_area.selectionEnd ];
+            }
+        };
 
     var controls = {
 
         mouse_down_cell : null,
+        mouse_move_cell : null,
         is_mouse_down : false,
         is_shift_down : false,
         is_ctrl_down : false,
+        is_alt_down : false,
 
-        set_mouse_down : function( x, y ) {
+        check_keys : function ( e ) {
+
+            this.is_ctrl_down = e.ctrlKey || e.metaKey;
+            this.is_shift_down = e.shiftKey;
+            this.is_alt_down = e.altKey;
+        },
+
+        set_mouse_down : function ( v ) {
 
             this.is_mouse_down = true;
-            this.mouse_down_cell = new Cell().setXY( x, y );
+
+            var c = new Cell().setXY( v.x, v.y );
+
+            if ( !is_in_values( c ) )
+                return;
+
+            this.mouse_down_cell = c.clone();
+            this.mouse_move_cell = c.clone();
+
+            c = unproject( c ).max( cell_zero );
+
+            selection.a && new Area( c ).contains( selection.a ) && edit.set( c ) || selection.set( new Area( c ) );
+
+            exports.update();
 
             return this;
         },
-        set_mouse_up : function( x, y ) {
+
+        set_mouse_up : function ( v ) {
 
             this.is_mouse_down = false;
             this.mouse_down_cell = null;
@@ -445,282 +792,319 @@ function Pivot( canvas ) {
             return this;
         },
 
-        is_selection : function() {
+        set_mouse_move : function ( v ) {
 
-            return this.is_mouse_down && this.is_shift_down;
-        },
+            if ( !this.is_mouse_down || !this.mouse_down_cell )
+                return this;
 
-        move : function( x, y ) {
+            var c = new Cell().setXY( v.x, v.y );
 
-            if ( ! ( this.mouse_down_cell && !this.is_shift_down && !this.is_ctrl_down && this.is_mouse_down ) )
+            if ( this.mouse_move_cell && this.mouse_move_cell.equals( c ) )
                 return;
 
-            var c = new Cell().setXY( x, y );
-            var mx = this.mouse_down_cell.i - c.i;
-            var my = this.mouse_down_cell.j - c.j;
+            this.mouse_move_cell = c;
 
-            /*var h = ( Math.abs( mx ) > Math.abs( my ) ) + 0;
-            mx *= h;
-            my *= ( 1 - h );*/
+            selection.set( new Area( unproject( this.mouse_down_cell ), unproject( this.mouse_move_cell ) ) );
 
-            var dx_local = this.mouse_down_cell.absi - this.mouse_down_cell.i;
-            var dy_local = this.mouse_down_cell.absj - this.mouse_down_cell.j;
-            mx += dx_local;
-            my += dy_local;
+            exports.update();
 
-            return ( mx || my ) && {
+            return this;
+        },
 
-                x : mx,
-                y : my
+        set_mouse_wheel : function ( y ) {
+
+            y = Math.floor( 10 * y / canvas.height );
+
+            y && exports.Range.scroll.setShift( 0, y ) && exports.update();
+
+            return this;
+        },
+
+        set_mouse_click : function ( v ) {
+
+            var c = new Cell().setXY( v.x, v.y );
+
+            if ( !c )
+                return;
+
+            var s = unproject( c );
+
+            is_in_row_header( c ) &&
+            on_header_row_click_callback &&
+            on_header_row_click_callback( exports.data.get_row( s ), s.i, s.j );
+
+            is_in_col_header( c ) &&
+            on_header_col_click_callback &&
+            on_header_col_click_callback( exports.data.get_col( s ), s.i, s.j );
+
+            is_in_values( c ) &&
+            on_data_click_callback &&
+            on_data_click_callback( exports.data.get_value( s ), s.i, s.j );
+
+            return this;
+        },
+
+        set_mouse_dblclick : function ( v ) {
+
+            //var c = new Cell().setXY( x, y );
+            //edit_cell = is_in_values( c ) && unproject( c );
+        },
+
+        set_key_down : function ( e ) {
+
+            this.check_keys( e );
+
+            if ( this.is_ctrl_down || this.is_alt_down )
+                return;
+
+            function cursor( c ) {
+
+                var abc = selection.a && selection.a.c1.clone().add( c );
+
+                if ( selection.a.c1.equals( abc ) )
+                    return;
+
+                selection.set( new Area( abc ) );
+
+                var va = exports.Range.values.clone();
+                va.c2.sub( cell_one );
+                exports.Range.scroll.add( va.distTo( project( abc ) ) );
             }
-        }
-    };
 
-    var selection = {
+            switch ( e.key ) {
 
-        c1 : null,
-        c2 : null,
-        values : null,
+                case 'ArrowDown' :
+                    cursor( cell_down );
+                    break;
+                case 'ArrowLeft' :
+                    cursor( cell_left );
+                    break;
+                case 'ArrowRight' :
+                    cursor( cell_right );
+                    break;
+                case 'ArrowUp' :
+                    cursor( cell_up );
+                    break;
+                default :
 
-        add : function( c ) {
+                    selection.a && !edit.c && (
+                        selection.a.c1.equals( selection.a.c2 ) ||
+                        selection.set( new Area( selection.a.c1 ) )
+                    ) && edit.set( selection.a.c1 );
 
-            this.c1 = this.c1 || c;
-            this.c2 = this.c1 && c;
+                    break;
+            }
 
-            this.values = this.get_visible_text();
+            exports.update();
 
             return this;
         },
 
-        clear : function() {
+        set_key_up : function ( e ) {
 
-            this.c1 = null;
-            this.c2 = null;
+            function copy_to_clipboard() {
 
+                input_text_area.select();
+                document.execCommand( 'Copy' );
+            }
+
+            var c = e.key;
+
+            this.check_keys( e );
+
+            if ( this.is_ctrl_down && c == 'c' ) //ctrl+c {
+                copy_to_clipboard();
+            //if (ctrlDown && c == 86) return false //ctrl+v
+            //if (ctrlDown && c == 88) return false //ctrl+x
             return this;
-        },
-
-        box : function() {
-
-            var c1 = this.c1;
-            var c2 = this.c2;
-
-            return c1 && c2 && {
-
-                from : new Cell(
-                    Math.min( c1.absi - dx, c2.absi - dx ),
-                    Math.min( c1.absj - dy, c2.absj - dy )
-                ),
-                to : new Cell(
-                    Math.max( c1.absi - dx, c2.absi - dx ),
-                    Math.max( c1.absj - dy, c2.absj - dy )
-                )
-            };
-        },
-
-        get_visible_text : function() {
-
-            var b = this.box();
-            var ret = [];
-
-            b && rows.go( b.from.j, b.to.j - b.from.j + 1, function( row, j ) {
-
-                ret.push( [] );
-                cols.go( b.from.i, b.to.i - b.from.i + 1, function( col, i ) {
-
-                    ret[ ret.length - 1].push( data_any( new Cell( i, j ) ).txt );
-                });
-            });
-
-            return ret;
         }
     };
 
-    var on_data_demand_callback = null;
-    var on_header_col_click_callback = null;
-    var on_header_row_click_callback = null;
-    var on_data_click_callback = null;
-    var data = null;
+    var on_header_col_click_callback = null,
+        on_header_row_click_callback = null,
+        on_data_click_callback = null,
+        on_data_change_callback = null;
 
-    this.on_data_demand = function( f ) {
+    var on_data_change = function ( f ) {
 
-        on_data_demand_callback = f;
+        on_data_change_callback = f;
     };
 
-    this.on_header_col_click = function( f ) {
+    var on_header_col_click = function ( f ) {
 
         on_header_col_click_callback = f;
     };
 
-    this.on_header_row_click = function( f ) {
+    var on_header_row_click = function ( f ) {
 
         on_header_row_click_callback = f;
     };
 
-    this.on_data_click = function( f ) {
+    var on_data_click = function ( f ) {
 
         on_data_click_callback = f;
     };
 
-    this.set_data = function( d ) {
+    var data = {
 
-        data = d;
-        header_of_cols = header( d.cols.headers );
-        header_of_rows = header( d.rows.headers );
+        buffer : null,
 
-        draw();
-    };
+        get_value : function ( c ) {
 
-    this.update = function( reset ) {
+            return this.buffer && this.buffer.values && this.buffer.values[ c.i ] && this.buffer.values[ c.i ][ c.j ];
+        },
 
-        var frame_width = 10;
-        var frame_height = 10;
+        get_col : function ( c ) {
 
-        var fix_cols = header_of_rows && header_of_rows.fix || 0;
-        var fix_rows = header_of_cols && header_of_cols.fix || 0;
+            return this.buffer && this.buffer.cols && this.buffer.cols[ c.i ] && this.buffer.cols[ c.i ][ c.j ];
+        },
 
-        if ( !data ||
-            reset ||
-            dx < data.cols.from ||
-            dy < data.rows.from ||
-            Math.min( data.cols.total, dx + cols.length - fix_cols ) > data.cols.from + data.cols.count ||
-            Math.min( data.rows.total, dy + rows.length - fix_rows ) > data.rows.from + data.rows.count ) {
+        get_row : function ( c ) {
 
-            var col1 = Math.max( 0, dx - frame_width );
-            var row1 = Math.max( 0, dy - frame_height );
-            var n_cols = cols.length - fix_cols + frame_width * 2;
-            var n_rows = rows.length - fix_rows + frame_height * 2;
-
-            on_data_demand_callback && on_data_demand_callback( col1, row1, n_cols, n_rows );
-        } else
-            draw();
-    };
-
-    this.scroll = function( x, y, set ) {
-
-        var dx0 = dx;
-        var dy0 = dy;
-
-        dx = Math.max( 0, ( !set && dx ) + x );
-        dy = Math.max( 0, ( !set && dy ) + y );
-
-        if ( dx != dx0 || dy != dy0 )
-            this.update();
-    };
-
-    this.mouse_click = function( x, y ) {
-
-        var c = new Cell().setXY( x, y );
-
-        if ( !c )
-            return;
-
-        var i = c.i,
-            j = c.j;
-
-        var item = data_any( c );
-
-        var col = i + dx - header_of_rows.fix;                                                                          //data grid pos
-        var row = j + dy - header_of_cols.fix;                                                                          //data grid pos
-
-        i < header_of_rows.fix && on_header_row_click_callback && on_header_row_click_callback( item, i, row );
-        j < header_of_cols.fix && on_header_col_click_callback && on_header_col_click_callback( item, col, j );
-        i >= header_of_cols.fix && j >= header_of_rows.fix && on_data_click_callback && on_data_click_callback( item, col, row );
-    };
-
-    this.mouse_down = function( x, y ) {
-
-        controls.set_mouse_down( x, y );
-
-        var c = new Cell().setXY( x, y );
-
-        if ( controls.is_shift_down ) {
-
-            selection.add( c );
-        } else {
-
-            selection.clear().add( c );
+            return this.buffer && this.buffer.rows && this.buffer.rows[ c.j ] && this.buffer.rows[ c.j ][ c.i ];
         }
     };
 
-    this.mouse_up = function( x, y ) {
+    var set_data = function ( d ) {
 
-        if ( controls.is_selection() )
-            selection.cell2 = new Cell().setXY( x, y ) || selection.cell2;
+        exports.data.buffer = d;
 
-        controls.set_mouse_up( x, y );
-
-        draw();
+        return this;
     };
 
-    this.mouse_move = function( x, y ) {
-
-        var mv = controls.move( x, y );
-        mv && this.scroll( mv.x, mv.y, true );
-    };
-
-    this.mouse_wheel = function( y ) {
-
-        y && this.scroll( 0, Math.floor( 10 * y / canvas.height ) );
-    };
-
-    this.key_up = function( e ) {
-
-        controls.is_ctrl_down  = ( e.ctrlKey || e.metaKey );
-        controls.is_shift_down = e.shiftKey;
-
-        var c = e.keyCode;
-
-        if ( controls.is_ctrl_down && c == 67 )//ctrl+c
-            copy_to_clipboard();
-        //if (ctrlDown && c == 86) return false //ctrl+v
-        //if (ctrlDown && c == 88) return false //ctrl+x
-    };
-
-    this.key_down = function( e ) {
-
-        controls.is_ctrl_down  = e.ctrlKey || e.metaKey;
-        controls.is_shift_down  = e.shiftKey;
-    };
-
-    function copy_to_clipboard() {
-
-        function to_clipboard( s ){
-
-            var tmp = document.createElement( 'textarea' );
-
-            document.body.appendChild( tmp );
-            //tmp.setAttribute( 'value', s );
-            tmp.innerHTML = s;
-            tmp.select();
-            document.execCommand( 'Copy' );
-            document.body.removeChild( tmp );
-        }
+    function get_text( a ) {
 
         function format_jagged_array( a ) {
 
             var ret = '',
                 sep = '\t';
 
-            a && a.forEach( function( row, j ) {
+            a && a.forEach( function ( row, j ) {
 
                 ret += ( j > 0 && '\n' ) || '';
 
-                row.forEach( function( d, i ) {
+                row.forEach( function ( d, i ) {
 
                     ret += ( i > 0 && sep || '' ) + d;
-                });
-            });
+                } );
+            } );
 
             return ret;
         }
 
-        return to_clipboard(
-            format_jagged_array(
-                selection.values
-            )
-        );
+        var ret = [];
+
+        for ( var j = a.c1.j; j <= a.c2.j; j++ ) {
+
+            ret.push( [] );
+            for ( var i = a.c1.i; i <= a.c2.i; i++ ) {
+
+                var c = new Cell( i, j );
+                var cell_data = exports.data.get_value( c );
+                ret[ ret.length - 1 ].push( cell_data && cell_data.txt || '' );
+            }
+        }
+
+        return format_jagged_array( ret );
     }
 
+    exports.draw = function (  ) {
 
-}
+        draw();
+    };
+
+    exports.update = function() {
+
+        exports.Range.update();
+
+        exports.draw();
+
+        return this;
+    };
+
+    var resize = function () {
+
+        cols = bars( Config.CELL_W, canvas.width );
+        rows = bars( Config.CELL_H, canvas.height );
+        draw = new grid( canvas.width, canvas.height );
+
+        return this;
+    };
+
+    function coords( event ) {
+
+        return new Vec( event.clientX - canvas.offsetLeft, event.clientY - canvas.offsetTop );
+    }
+
+    function KeyUp() {
+
+        controls.set_key_up( event );
+    }
+
+    function KeyDown() {
+
+        controls.set_key_down( event );
+    }
+
+    function MouseClick( e ) {
+
+        event.preventDefault();
+
+        event && controls.set_mouse_click( coords( e ) );
+    }
+
+    function MouseDblClick( e ) {
+
+        event.preventDefault();
+
+        event && controls.set_mouse_dblclick( coords( e ) );
+    }
+
+    function MouseDown( e ) {
+
+        event.preventDefault();
+
+        event && controls.set_mouse_down( coords( e ) );
+    }
+
+    function MouseUp( e ) {
+
+        event.preventDefault();
+
+        event && controls.set_mouse_up( coords( e ) );
+    }
+
+    function MouseMove( e ) {
+
+        event.preventDefault();
+
+        event && controls.set_mouse_move( coords( e ) );
+    }
+
+    function MouseWheel( e ) {
+
+        event.preventDefault();
+
+        event && controls.set_mouse_wheel( e.deltaY );
+    }
+
+    var input_text_area = null;
+
+    exports.set_canvas = set_canvas;
+    exports.resize = resize;
+    exports.set_data = set_data;
+    exports.on_data_change = on_data_change;
+    exports.on_header_col_click = on_header_col_click;
+    exports.on_header_row_click = on_header_row_click;
+    exports.on_data_click = on_data_click;
+    exports.project = project;
+    exports.unproject = unproject;
+    exports.Cell = Cell;
+    exports.Area = Area;
+    exports.data = data;
+    exports.Range = Range;
+    exports.Config = Config;
+
+    return exports;
+
+}( Pivot || {} ));
