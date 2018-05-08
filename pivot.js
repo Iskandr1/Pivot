@@ -424,6 +424,8 @@ var Pivot = (function( exports ) {
         //var ctx = canvas.getContext('2d', { alpha: false });
         ctx.textBaseline = 'middle';
 
+        var letter_width = ctx.measureText( '1234567910abcdeABCDE' ).width * 0.05;
+
         var style_value = {
 
             margin_x : 5,
@@ -475,6 +477,7 @@ var Pivot = (function( exports ) {
             var r_center = r.getCenter();
             var r_far = r.getFarCorner();
             var s_txt = s.format( obj );
+            s_txt = s_txt && s_txt.substring( 0, Math.floor( r.width / letter_width ) - 1 );
 
             return {
 
@@ -928,21 +931,29 @@ var Pivot = (function( exports ) {
     var on_data_change = function ( f ) {
 
         on_data_change_callback = f;
+
+        return this;
     };
 
     var on_header_col_click = function ( f ) {
 
         on_header_col_click_callback = f;
+
+        return this;
     };
 
     var on_header_row_click = function ( f ) {
 
         on_header_row_click_callback = f;
+
+        return this;
     };
 
     var on_data_click = function ( f ) {
 
         on_data_click_callback = f;
+
+        return this;
     };
 
     var data = {
