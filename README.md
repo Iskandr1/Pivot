@@ -13,3 +13,5 @@ Pivot.js is an open-source javascript HTML5 Canvas based multidimensional UI gri
 * Edit events could be handled
 * Pure javascript ( ECMAScript 5.1 ). No libraries or frameworks used.
 * It's free, nice and easy!
+
+[Demo](https://iskandr1.github.io/Pivot/demo.html)
