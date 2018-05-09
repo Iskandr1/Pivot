@@ -17,12 +17,21 @@ Pivot.js is an open-source javascript HTML5 Canvas based multidimensional UI gri
 
 ---
 ### Controls
-Mouse click to select cell
-Mouse down and move to select area
-Use keyboard arrows to shift selection
-Shift selected cell by arrow keys to borders to scroll
-Mouse wheel to vertical scroll
-Type to edit values in selected cell
-Ctrl+C to copy values from selected area to buffer
-Mouse click on headers with '-' sign to collapse node
-Mouse click on headers with '+' sign to expand node
+ 
+ Mouse click to select cell
+ 
+ Mouse down and move to select area
+ 
+ Use keyboard arrows to shift selection
+ 
+ Shift selected cell by arrow keys to borders to scroll
+ 
+ Mouse wheel to vertical scroll
+ 
+ Type to edit values in selected cell
+ 
+ Ctrl+C to copy values from selected area to buffer
+ 
+ Mouse click on headers with '-' sign to collapse node
+ 
+ Mouse click on headers with '+' sign to expand node
