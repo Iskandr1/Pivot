@@ -20,8 +20,8 @@ var Pivot = (function( exports ) {
         CELL_H : 26,
         CELL_EDIT_UNDERLINE_MARGIN : 5,
         CELL_EDIT_CURSOR_MARGIN : 3,
-        FONT_VALUE : '10px Roboto Mono',
-        FONT_HEADER : '10px Roboto Mono',
+        FONT_VALUE : '11px Arial',
+        FONT_HEADER : '11px Arial',
         set : function( cfg ) {
 
             Object.assign( this, cfg );
@@ -35,7 +35,8 @@ var Pivot = (function( exports ) {
         return Object.assign( Object.assign( {}, dst ), src );
     }
 
-    var canvas = null;
+    var canvas = null,
+        dom_stat = null;
 
     var set_canvas = function( dom ) {
 
@@ -58,6 +59,8 @@ var Pivot = (function( exports ) {
         canvas.addEventListener( 'wheel', MouseWheel, false );
         canvas.ownerDocument.addEventListener( 'keyup', KeyUp, false );
         canvas.ownerDocument.addEventListener( 'keydown', KeyDown, false );
+
+        dom_stat = document.getElementById( "stat" );
 
         this.resize();
 
@@ -225,7 +228,7 @@ var Pivot = (function( exports ) {
         }
     };
 
-    const
+    var
         cell_zero = new Cell(),
         cell_left = new Cell( -1, 0 ),
         cell_right = new Cell( 1, 0 ),
@@ -679,7 +682,7 @@ var Pivot = (function( exports ) {
             } );
 
             var time = new Date() - log_start_time;
-            document.getElementById( "stat" ).innerHTML = time + " ms";
+            dom_stat && ( dom_stat.innerHTML = time + " ms" );
         }
     };
 
