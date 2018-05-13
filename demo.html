@@ -2,12 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Pivot</title>
-    <link href="pivot.css" rel="stylesheet" type="text/css">
+    <title>HTML Canvas Pivot tree grid Demo page</title>
     <script src="demo.data.min.js"></script>
     <script src="pivot.js"></script>
 </head>
-<body>
+<body style="background-color: #AAAAAA">
 
 <div id="stat" style="position: absolute; width: auto; height: auto;"></div>
 <div id="grid"></div>
@@ -17,7 +16,6 @@
     document.getElementById( 'grid' ).appendChild( canvas );
     canvas.width = window.innerWidth - 20;
     canvas.height = window.innerHeight - 20;
-
 
     var pivot = Pivot.set_canvas( canvas );
 
@@ -33,16 +31,17 @@
 
     load_data();
 
-    pivot.on_header_col_click( function (obj, i, j) {
+    pivot
+        .on_header_col_click( function ( obj, i, j ) {
 
-                collapse_col( obj, i, j );
-                load_data();
-            })
-            .on_header_row_click( function (obj, i, j) {
+            collapse_col( obj, i, j );
+            load_data();
+        } )
+        .on_header_row_click( function ( obj, i, j ) {
 
-                collapse_row( obj, j, i );
-                load_data();
-            });
+            collapse_row( obj, j, i );
+            load_data();
+        } );
 
 </script>
 </body>

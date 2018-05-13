@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HTML Canvas Pivot tree grid Example page</title>
+    <script src="pivot.js"></script>
+</head>
+<body style="background-color: #AAAAAA">
+<div id="grid"></div>
+<script>
+
+    var canvas = document.createElement( 'canvas' );
+    document.getElementById( 'grid' ).appendChild( canvas );
+    canvas.width = window.innerWidth - 20;
+    canvas.height = window.innerHeight - 20;
+
+    //initialize a new pivot
+    var pivot = Pivot.set_canvas( canvas ); //set the canvas to draw on
+
+    //optional: chosen config defaults could be overridden
+    pivot.Config.set( {
+
+        COLOR_BACKGROUND : '#AAAAAA',
+        CELL_W : 102,
+        CELL_H : 26
+    } );
+
+    //pass a new data array
+    pivot.set_data( {
+
+            cols : [
+                [
+                    { //column header first row
+                        id: 1, //dimension id
+                        txt: 'United States', //header caption
+                        sign: 2, //header expanded
+                        lvl: 1 //header level
+                    }, 
+                    {id: 501, txt: 'All time', sign: 1, lvl: 1} //column header second row
+                ], 
+                [{id: 2, txt: 'South', sign: 1, lvl: 2}, {id: 501, txt: 'All time', sign: 2, lvl: 1}],
+                [{id: 2, txt: 'South', sign: 1, lvl: 2}, {id: 502, txt: '2016', sign: 1, lvl: 2}], 
+                [{id: 2, txt: 'South', sign: 1, lvl: 2}, {id: 503, txt: '2017', sign: 1, lvl: 2}], 
+                [{id: 3, txt: 'West', sign: 1, lvl: 2}, {id: 501, txt: 'All time', sign: 1, lvl: 1}], 
+                [{id: 4, txt: 'Central', sign: 1, lvl: 2}, {id: 501, txt: 'All time', sign: 1, lvl: 1}], 
+                [{id: 5, txt: 'East', sign: 1, lvl: 2}, {id: 501, txt: 'All time', sign: 1, lvl: 1}]
+            ], 
+            rows :  [
+                [{id: 1, txt: 'All products', sign: 2, lvl: 1}, {id: 7, txt: 'All customers', sign: 1, lvl: 1}], //row header
+                [{id: 2, txt: 'Furniture', sign: 1, lvl: 2}, {id: 7, txt: 'All customers', sign: 1, lvl: 1}], 
+                [{id: 3, txt: 'Office Supplies', sign: 1, lvl: 2}, {id: 7, txt: 'All customers', sign: 1, lvl: 1}], 
+                [{id: 4, txt: 'Technology', sign: 2, lvl: 2}, {id: 7, txt: 'All customers', sign: 1, lvl: 1}], 
+                [{id: 5, txt: 'Phones', sign: 0, lvl: 3}, {id: 7, txt: 'All customers', sign: 2, lvl: 1}], 
+                [{id: 5, txt: 'Phones', sign: 0, lvl: 3}, {id: 9, txt: 'Corporate', sign: 2, lvl: 2}], 
+                [{id: 5, txt: 'Phones', sign: 0, lvl: 3}, {id: 13, txt: 'Women', sign: 0, lvl: 3}], 
+                [{id: 5, txt: 'Phones', sign: 0, lvl: 3}, {id: 14, txt: 'Men', sign: 0, lvl: 3}], 
+                [{id: 5, txt: 'Phones', sign: 0, lvl: 3}, {id: 10, txt: 'Home Office', sign: 1, lvl: 2}], 
+                [{id: 6, txt: 'Accessories', sign: 0, lvl: 2}, {id: 7, txt: 'All customers', sign: 1, lvl: 1}]
+            ], 
+            values :  [
+                [
+                    {
+                        txt: 4561, //value to be displayed
+                        sign: 4 //optional: read-only
+                    },
+                    {
+                        txt: 'Hello World!',
+                        sign: 3 //edit enabled
+                    },
+                    {txt: 2725}, {txt: 871}, {txt: 418}, {txt: 128}, {txt: 34}, {txt: 94}, {txt: 66}, {txt: 364}
+                ],
+                [ {txt: 584},  {txt: 144}, {txt: 321},  {txt: 119}, {txt: 57},  {txt: 9},   {txt: 2},  {txt: 7},  {txt: 9},  {txt: 57} ],//column of values
+                [ {txt: 290},  {txt: 47},  {txt: 168},  {txt: 75},  {txt: 39},  {txt: 7},   {txt: 2},  {txt: 5},  {txt: 9},  {txt: 35} ],
+                [ {txt: 294},  {txt: 97},  {txt: 153},  {txt: 44},  {txt: 18},  {txt: 2},   {txt: 0},  {txt: 2},  {txt: 0},  {txt: 22} ],
+                [ {txt: 1364}, {txt: 296}, {txt: 788},  {txt: 280}, {txt: 119}, {txt: 28},  {txt: 13}, {txt: 15}, {txt: 15}, {txt: 140} ],
+                [ {txt: 1135}, {txt: 222}, {txt: 691},  {txt: 222}, {txt: 105}, {txt: 43},  {txt: 13}, {txt: 30}, {txt: 17}, {txt: 89} ],
+                [ {txt: 1478}, {txt: 303}, {txt: 925},  {txt: 250}, {txt: 137}, {txt: 48},  {txt: 6},  {txt: 42}, {txt: 25}, {txt: 78} ]
+            ]
+        } )
+        .update() //call the update method when you've a new data array to draw
+        .on_header_col_click( function ( obj, i, j ) {
+
+            //process a mouse click on a column header here
+            //obj - object in the specified cell
+            //i - column number
+            //j - row number
+        } )
+        .on_header_row_click( function ( obj, i, j ) {
+
+            //process a mouse click on a row header here
+            //obj - object in the specified cell
+            //i - column number
+            //j - row number
+        } )
+        .on_data_click( function( obj, i, j) {
+
+            //process a mouse click on a value cell here
+            //obj - object in the specified cell
+            //i - column number
+            //j - row number
+        })
+        .on_data_change( function( txt, i, j) {
+
+            //txt - edited value in the specified cell
+            //i - column number
+            //j - row number
+        });
+
+</script>
+</body>
+</html>
