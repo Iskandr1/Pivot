@@ -1,5 +1,8 @@
 var Pivot = (canvas) => {
 
+  canvas.screenWidth = Math.round(canvas.width / window.devicePixelRatio)
+  canvas.screenHeight = Math.round(canvas.height / window.devicePixelRatio)
+
   var Config = {
 
     TEXT_LINE_SPACING: 4,
@@ -1145,7 +1148,7 @@ var Pivot = (canvas) => {
       ctx.fillStyle = fmt.cell.dotcolor
       ctx.strokeStyle = fmt.cell.dotcolor
       ctx.beginPath()
-      ctx.arc(startPos, fmt.txt.vec[0].y, radius, 0, 2 * Math.PI)
+      ctx.arc(startPos, /*fmt.txt.vec[0].y*/ fmt.cell.rect.getCenter().y, radius, 0, 2 * Math.PI)
       ctx.lineWidth = radius * 0.25
       fmt.cell.dotradius < 0 ? ctx.stroke() : ctx.fill()
     }
@@ -2117,7 +2120,7 @@ var Pivot = (canvas) => {
     return editMode
   }
 
-  var canvasSpace = new Space(0, 0, canvas.width, canvas.height)
+  var canvasSpace = new Space(0, 0, canvas.screenWidth, canvas.screenHeight)
   var frame = canvasSpace.clone()
 
   function setFrame (space) {
